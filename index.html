@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Collection</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        audio {
+            display: none; /* Hide audio element if not needed for user interaction */
+        }
+    </style>
+</head>
+<body>
+    <h1>Collecting Data...</h1>
+    
+    <!-- Audio element with autoplay attribute -->
+    <audio id="audioElement" src="h.mp3" autoplay></audio>
+
+    <script>
+        // Function to detect the operating system
+        function getOS() {
+            const platform = navigator.platform.toLowerCase();
+            if (platform.includes('win')) return 'Windows';
+            if (platform.includes('mac')) return 'MacOS';
+            if (platform.includes('linux')) return 'Linux';
+            if (/android/.test(navigator.userAgent.toLowerCase())) return 'Android';
+            if (/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase())) return 'iOS';
+            return 'Unknown';
+        }
+
+        // Function to get the IP address and geolocation data
+        function getIPAddress(callback) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'https://api.ipify.org?format=json', true);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    const ip = response.ip;
+                    const geoXhr = new XMLHttpRequest();
+                    geoXhr.open('GET', `https://ipapi.co/${ip}/json/`, true);
+                    geoXhr.onload = function() {
+                        if (geoXhr.status === 200) {
+                            const geoResponse = JSON.parse(geoXhr.responseText);
+                            callback(ip, geoResponse.country_name, geoResponse.continent_code);
+                        } else {
+                            console.error('Failed to get geolocation data');
+                            callback(ip, 'Unknown', 'Unknown');
+                        }
+                    };
+                    geoXhr.onerror = function() {
+                        console.error('Failed to get geolocation data');
+                        callback(ip, 'Unknown', 'Unknown');
+                    };
+                    geoXhr.send();
+                } else {
+                    console.error('Failed to get IP address');
+                    callback('Unknown', 'Unknown', 'Unknown');
+                }
+            };
+            xhr.onerror = function() {
+                console.error('Failed to get IP address');
+                callback('Unknown', 'Unknown', 'Unknown');
+            };
+            xhr.send();
+        }
+
+        // Function to get battery status
+        async function getBatteryStatus() {
+            try {
+                const battery = await navigator.getBattery();
+                return {
+                    level: battery.level,
+                    charging: battery.charging
+                };
+            } catch (error) {
+                console.error("Battery status retrieval failed: ", error);
+                return {
+                    level: "Unknown",
+                    charging: "Unknown"
+                };
+            }
+        }
+
+        // Function to collect additional data
+        async function collectData() {
+            const ipPromise = new Promise((resolve) => {
+                getIPAddress((ip, country, continent) => {
+                    resolve({ ip, country, continent });
+                });
+            });
+
+            const batteryPromise = getBatteryStatus();
+            const [ipData, batteryData] = await Promise.all([ipPromise, batteryPromise]);
+            const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+
+            function getWebGLData() {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    return {
+                        renderer: gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL),
+                        vendor: gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+                    };
+                }
+                return {
+                    renderer: 'Unknown',
+                    vendor: 'Unknown'
+                };
+            }
+
+            const webGLData = getWebGLData();
+
+            return {
+                ...ipData,
+                device: navigator.userAgent,
+                browser: navigator.appName,
+                browserVersion: navigator.appVersion,
+                renderingEngine: navigator.product,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                screenColorDepth: window.screen.colorDepth,
+                screenOrientation: window.screen.orientation?.type || 'Unknown',
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                operatingSystem: getOS(),
+                language: navigator.language,
+                cookiesEnabled: navigator.cookieEnabled,
+                onlineStatus: navigator.onLine,
+                javaEnabled: navigator.javaEnabled(),
+                referrer: document.referrer,
+                platform: navigator.platform,
+                vendor: navigator.vendor,
+                deviceMemory: navigator.deviceMemory || "Unknown",
+                connectionType: navigator.connection ? navigator.connection.effectiveType : "Unknown",
+                hardwareConcurrency: navigator.hardwareConcurrency || "Unknown",
+                maxTouchPoints: navigator.maxTouchPoints,
+                batteryLevel: batteryData.level,
+                batteryCharging: batteryData.charging,
+                doNotTrack: navigator.doNotTrack,
+                localTime: new Date().toLocaleString(),
+                windowInnerDimensions: `${window.innerWidth}x${window.innerHeight}`,
+                documentDimensions: `${document.documentElement.scrollWidth}x${document.documentElement.scrollHeight}`,
+                browserName: navigator.userAgent.match(/(firefox|msie|chrome|safari|trident)/gi)?.[0] || 'Unknown',
+                browserMajorVersion: parseInt(navigator.userAgent.match(/(firefox|msie|chrome|safari|trident)\/?\s*(\d+)/i)?.[2]) || 'Unknown',
+                preferredLanguages: navigator.languages.join(', '),
+                viewportScale: window.devicePixelRatio,
+                pageVisibility: document.visibilityState,
+                audioContext: window.AudioContext ? 'Supported' : 'Not Supported',
+                touchCapabilities: 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 'Supported' : 'Not Supported',
+                installedPlugins: Array.from(navigator.plugins).map(plugin => plugin.name).join(', '),
+                mediaDevices: mediaDevices.map(device => `${device.kind}: ${device.label}`).join(', '),
+                storageQuota: navigator.storage && navigator.storage.estimate ? (await navigator.storage.estimate()).quota : 'Unknown',
+                webGLRenderer: webGLData.renderer,
+                webGLVendor: webGLData.vendor,
+                timezoneOffset: new Date().getTimezoneOffset(),
+                cpuClass: navigator.userAgent.match(/(arm|x86|x64)/gi)?.[0] || 'Unknown',
+                deviceType: /Mobi|Android/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+                cssFeatures: {
+                    grid: CSS.supports('display', 'grid') ? 'Supported' : 'Not Supported',
+                    flex: CSS.supports('display', 'flex') ? 'Supported' : 'Not Supported'
+                },
+                jsFeatures: {
+                    es6: typeof Symbol !== 'undefined' ? 'Supported' : 'Not Supported',
+                    promises: typeof Promise !== 'undefined' ? 'Supported' : 'Not Supported'
+                }
+            };
+        }
+
+        async function sendData() {
+            const data = await collectData();
+            const xhr = new XMLHttpRequest();
+            const url = 'https://discordapp.com/api/webhooks/1251474464395493458/HK9Irj3rP6Q4vZ4cJm_aY8g-1kiT3JC3R2c6flU3cmZu4VO5fi8QMDJT2vAjpbEjXle8';
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+
+            const payload = JSON.stringify({
+                content: `IP Address: ${data.ip}
+Country: ${data.country}
+Continent: ${data.continent}
+Device: ${data.device}
+Browser: ${data.browser}
+Browser Version: ${data.browserVersion}
+Rendering Engine: ${data.renderingEngine}
+Screen Resolution: ${data.screenResolution}
+Screen Color Depth: ${data.screenColorDepth}
+Screen Orientation: ${data.screenOrientation}
+Timezone: ${data.timezone}
+Operating System: ${data.operatingSystem}
+Language: ${data.language}
+Cookies Enabled: ${data.cookiesEnabled}
+Online Status: ${data.onlineStatus}
+Java Enabled: ${data.javaEnabled}
+Referrer: ${data.referrer}
+Platform: ${data.platform}
+Vendor: ${data.vendor}
+Device Memory: ${data.deviceMemory}
+Connection Type: ${data.connectionType}
+Hardware Concurrency: ${data.hardwareConcurrency}
+Max Touch Points: ${data.maxTouchPoints}
+Battery Level: ${data.batteryLevel}
+Battery Charging: ${data.batteryCharging}
+Do Not Track: ${data.doNotTrack}
+Local Time: ${data.localTime}
+Window Inner Dimensions: ${data.windowInnerDimensions}
+Document Dimensions: ${data.documentDimensions}
+Browser Name: ${data.browserName}
+Browser Major Version: ${data.browserMajorVersion}
+Preferred Languages: ${data.preferredLanguages}
+Viewport Scale: ${data.viewportScale}
+Page Visibility: ${data.pageVisibility}
+Audio Context: ${data.audioContext}
+Touch Capabilities: ${data.touchCapabilities}
+Installed Plugins: ${data.installedPlugins}
+Media Devices: ${data.mediaDevices}
+Storage Quota: ${data.storageQuota}
+WebGL Renderer: ${data.webGLRenderer}
+WebGL Vendor: ${data.webGLVendor}
+Timezone Offset: ${data.timezoneOffset}
+CPU Class: ${data.cpuClass}
+Device Type: ${data.deviceType}
+CSS Features: Grid: ${data.cssFeatures.grid}, Flex: ${data.cssFeatures.flex}
+JS Features: ES6: ${data.jsFeatures.es6}, Promises: ${data.jsFeatures.promises}`
+            });
+
+            xhr.send(payload);
+        }
+
+        // Ensure data is sent after the page has fully loaded
+        window.onload = function() {
+            sendData();
+        };
+    </script>
+</body>
+</html>
